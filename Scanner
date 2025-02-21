@@ -1,0 +1,81 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Feb 19 19:29:13 2025
+
+@author: dogeb
+"""
+
+import requests
+from bs4 import BeautifulSoup
+import csv
+from urllib.parse import urlparse
+import time
+
+def scan_website(url, output_file):
+    """
+    scans website using recipe
+    """
+    try:
+        # headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        # validates url
+        parsed_url = urlparse(url)
+        if not all([parsed_url.scheme, parsed_url.netloc]):
+            raise ValueError("Invalid URL format")
+            
+        # add delay
+        time.sleep(1)
+        
+        # Make the request
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        # parse HTML
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # extract useful information
+        data = {
+            'title': soup.title.string if soup.title else 'No title found',
+            'meta_description': soup.find('meta', attrs={'name': 'description'})['content'] if soup.find('meta', attrs={'name': 'description'}) else 'No description found',
+            'links': [a.get('href') for a in soup.find_all('a', href=True)],
+            'images': [img.get('src') for img in soup.find_all('img', src=True)],
+            'headings': [h.text.strip() for h in soup.find_all(['h1', 'h2', 'h3'])]
+        }
+        
+        # write to CSV file
+        with open(output_file, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            
+            # Write headers
+            writer.writerow(['Type', 'Content'])
+            
+            # Write basic info
+            writer.writerow(['Title', data['title']])
+            writer.writerow(['Description', data['meta_description']])
+            
+            # Write lists of elements
+            for link in data['links']:
+                writer.writerow(['Link', link])
+            
+            for img in data['images']:
+                writer.writerow(['Image', img])
+                
+            for heading in data['headings']:
+                writer.writerow(['Heading', heading])
+                
+        return f"Scan complete. Results saved to {output_file}"
+        
+    except requests.exceptions.RequestException as e:
+        return f"Error making request: {str(e)}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+# Example usage
+if __name__ == "__main__":
+    target_url = input("Enter URL to scan: ")
+    output_file = "scan_results.csv"
+    result = scan_website(target_url, output_file)
+    print(result)
